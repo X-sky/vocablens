@@ -6,16 +6,20 @@
 
 | 项目 | 值 |
 | --- | --- |
-| 公开地址（现行） | https://q3yd8d39dmqgh.space.mcode.cn |
-| Drive 节点 ID（现行） | `464999192441336`（category=`website`） |
-| 部署项目名 | `VocabLens 词镜` |
-| 部署域名（现行） | `q3yd8d39dmqgh.space.mcode.cn` |
+| **公开地址（唯一现行）** | **https://x-sky.github.io/vocablens/** |
+| 托管方式 | GitHub Pages，仓库 https://github.com/X-sky/vocablens （public），分支 `gh-pages`，分支根目录即站点根 |
 | 词库规模 | 40 组 / 129 词条 / 29 个语义分类 |
-| 旧版（已冻结） | https://8iorbardnid05.space.mcode.cn ，节点 `464929411003387`，停在 37 组 / 112 词条 |
+| 平台镜像（备用） | https://q3yd8d39dmqgh.space.mcode.cn ，Drive 节点 `464999192441336` |
 
-> ⚠️ **平台不支持原地更新**：每次调用部署工具都会新建一个节点并新铸一个域名，`project_name` 相同也一样。
-> 旧节点不会自动更新，新域名也不会覆盖旧域名。所以「改完自动更新同一个网址」是做不到的，
-> 每次维护后都必须把新地址同步到本文档、skill 参考文档和记忆，并把新站点作为唯一现行版本。
+> ✅ **地址永久固定**：站点托管在 GitHub Pages，以后每次维护都是往同一个 `gh-pages` 分支推代码，
+> 网址不动，别人收藏的链接不会失效。相对路径引用，放在 `/vocablens/` 子路径下正常工作。
+>
+> ⚠️ **不要用平台部署当主线**：`website_deploy` 每次调用都会新建节点并新铸域名，
+> `project_name` 相同也不会原地更新（2026-11-19 连续两次部署实测得到两个不同域名）。
+> 工具层没有「更新已有站点」也没有「绑定自定义域名」的能力。
+> 平台站只当备用镜像用；真用了必须把新地址同步到本文档、`README.md`、skill 参考文档与记忆。
+>
+> 旧版 https://8iorbardnid05.space.mcode.cn 已于 2026-11-19 删除 Drive 节点，现为 404。
 
 ## 目录结构
 
@@ -43,27 +47,33 @@ vocablens/
    # 本沙箱的 playwright 只缺 headless shell，必须显式传 executable_path
    ```
 
-3. **发**：调用部署工具，参数固定为
+3. **发**：推 GitHub `gh-pages` 分支（主线，地址不变）
 
+   ```bash
+   # 组装 files 数组并推送
+   mcode-tools connector call connector__github__push_files --args-file /workspace/.tmp-push.json
+   # args.json = {owner:"X-sky", repo:"vocablens", branch:"gh-pages", message, files:[{path, content}]}
+   # files 必须含：index.html / styles.css / app.js / data/groups.js / README.md / MAINTENANCE.md / .nojekyll
    ```
-   path        = /workspace/vocablens
-   source_path = /workspace/vocablens
-   project_name = "VocabLens 词镜"
+
+   ⚠️ 推送 = 把站点发布到**公网**，任何人拿到链接都能访问。发布前必须先向用户说明并取得确认。
+
+   ⚠️ `.nojekyll` 必须保留，否则 Pages 会走 Jekyll 处理流程。
+
+4. **核**：等约 1 分钟让 Pages 构建，然后
+
+   ```bash
+   curl -sSL -o /dev/null -w "%{http_code}\n" https://x-sky.github.io/vocablens/
    ```
 
-   ⚠️ 部署会把站点发布到**公网**，任何人拿到链接都能访问。发布前必须先向用户说明并取得确认。
+   再用 Playwright 打开该地址，确认词库条数与本地一致、新词搜得到、弹层详情正常、
+   5 个视图可点、控制台零报错。刚推完时可能有几十秒传播延迟（短暂 404）。
 
-   ⚠️ 部署会**返回一个新域名**（工具返回值里就是新 URL），旧域名上的内容不会变。
+5. **备**：平台镜像（`website_deploy`）只在用户明确要求时用；它会新铸域名，
+   用了就得把新 URL 与新节点 ID 同步到本文件、`README.md`、skill 的 `references/site-ops.md`
+   与 agent memory 的 `vocablens-maintenance` 主题，并把旧节点在 Drive 里改名为「（旧版·已冻结）」。
 
-4. **核 + 同步**：部署后做四件事，缺一不可
-
-   - 核对返回的 URL 与 Drive 里的新节点（`drive files search` category=`website`）
-   - 用 curl / Playwright 打开新地址，确认词库条数与本地一致、控制台无报错
-   - 把新 URL 与新节点 ID 写回本文件的「线上状态」表、`README.md`、skill 的 `references/site-ops.md`，
-     以及 agent memory 的 `vocablens-maintenance` 主题
-   - 把新节点视为唯一现行版本；旧节点在 Drive 里改名为「（旧版·已冻结）」以免混淆
-
-   注：删除 Drive 节点会让那个站点的已发布 URL **直接 404 下线**（2026-11-19 实测，删除后可能有几秒到几十秒的
+   注：删除 Drive 节点会让该站点的已发布 URL **直接 404 下线**（2026-11-19 实测，删除后可能有几秒到几十秒的
    缓存延迟）。所以想下线某个旧站，删掉它的 Drive 节点即可，不必改代码。
 
 ## ⚠️ 平台注入物：不要写进源文件
@@ -144,3 +154,4 @@ window.GROUPS = [
 | 2026-11-19 | 新增词组 `robust-sturdy-solid-durable-tough-resilient`（sturdy / robust / solid / durable / tough / resilient，分类：程度与质量）；词库 37 → 38 组、112 → 118 词条、分类仍 29 个；本地验证通过（搜索命中、首页统计一致、控制台零报错）；**已入库待发布**（本轮未发布到公网），备份 zip 已刷新 |
 | 2026-11-19 | 新增词组 `heritage-legacy-tradition-inheritance-ancestry`（heritage / legacy / tradition / inheritance / ancestry，分类：历史与记忆）与 `modify-alter-convert-overhaul-transform-adapt`（modify / alter / convert / overhaul / transform / adapt，分类：动作与变化）；词库 38 → 40 组、118 → 129 词条、分类仍 29 个；发布到公网，新地址 https://q3yd8d39dmqgh.space.mcode.cn （节点 `464999192441336`）；旧站 https://8iorbardnid05.space.mcode.cn 冻结在 37 组 / 112 词条，节点改名为「旧版·已冻结」 |
 | 2026-11-19 | 机制更正：实测确认平台**每次部署都新建节点与新域名**，`project_name` 相同也不会原地更新（连续两次部署分别得到 `g5xy9n84k8r6s` 与 `q3yd8d39dmqgh`）。手册、技能文档与记忆中的「原地更新、URL 不变」说法已全部改正。删除 Drive 节点不会让已发布 URL 下线，旧网址仍可访问 |
+| 2026-11-19 | **迁移到 GitHub Pages**：新建公开仓库 https://github.com/X-sky/vocablens ，站点文件推到 `gh-pages` 分支根目录（含 `.nojekyll`），线上地址固定为 **https://x-sky.github.io/vocablens/** ，以后维护只推同一分支、网址不再变；Pages 对新仓库自动开启，无需手动开关；旧版 https://8iorbardnid05.space.mcode.cn 已删除 Drive 节点，现为 404；平台站 https://q3yd8d39dmqgh.space.mcode.cn 保留为备用镜像 |

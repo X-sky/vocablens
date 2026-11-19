@@ -2,7 +2,7 @@
 
 外语近义词**词义辨析**站 —— 查清每个词的边界、语感与用法差异，而不是只丢一堆同义词。
 
-线上地址：https://q3yd8d39dmqgh.space.mcode.cn
+线上地址：https://x-sky.github.io/vocablens/  （GitHub Pages 托管，地址永久固定）
 
 ## 三个模块
 
