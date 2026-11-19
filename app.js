@@ -59,6 +59,203 @@
   });
   function hue(cat) { return HUE[cat] === undefined ? 258 : HUE[cat]; }
 
+  /* ---------------- 共核：两个词真正共享的那部分 ---------------- */
+  /* 判定刻意保守 —— 宁可漏标，不可误标：
+     英文共核 = 共享词素 ≥4 字母，且贴在其中至少一个词的首或尾；
+     中文义核 = 共享片段 ≥2 字，且在双方释义里都「贴边」（完整词段，
+                 或词段的首/尾），这样才不会跨词误配出「来的财」这种碎片。 */
+  var CORE_MIN_EN = 4;
+  var CORE_MIN_ZH = 2;
+  var ZH_STOP = {};
+  ('的 了 是 和 或 也 都 而 及 与 被 把 个 种 类 后 前 中 上 下 不 没 很 更 最 有 可 会 要 用 作 做 指 表示 意思 含义 某种 一个 一样 不同 之间 可以 能够 进行 主要 尤其 常 多 少 大 小 人 事 物 时 地 来 去 出 到 给 让 使 过 得').split(' ').forEach(function (w) { ZH_STOP[w] = 1; });
+  var POS_WORDS = ['动词', '名词', '形容词', '副词', '介词', '连词', '代词', '数词', '量词', '短语',
+                   '及物动词', '不及物动词', '系动词', '短语动词', '动副短语', '形副短语'];
+
+  function stripPos(s) {
+    var t = String(s);
+    for (var i = 0; i < 4; i++) {
+      var m = t.match(/^\s*([\u4e00-\u9fff]{2,6})\s*(?:[\/／]\s*([\u4e00-\u9fff]{2,6}))?\s*[：:]\s*/);
+      if (!m) break;
+      if (POS_WORDS.indexOf(m[1]) < 0) break;
+      if (m[2] && POS_WORDS.indexOf(m[2]) < 0) break;
+      t = t.slice(m[0].length);
+    }
+    return t;
+  }
+
+  function segs(s) {
+    return stripPos(s).split(/[；;，,、。.（）()「」“”"'：:！!？?\/\-—–…·\s]+/).filter(Boolean);
+  }
+
+  function enCore(a, b) {
+    var x = String(a).toLowerCase(), y = String(b).toLowerCase();
+    var n = Math.min(x.length, y.length);
+    for (var len = n; len >= CORE_MIN_EN; len--) {
+      var cand = null;
+      if (x.slice(0, len) === y.slice(0, len)) cand = x.slice(0, len);
+      else if (x.slice(-len) === y.slice(-len)) cand = x.slice(-len);
+      else if (x.slice(0, len) === y.slice(-len)) cand = x.slice(0, len);
+      else if (x.slice(-len) === y.slice(0, len)) cand = x.slice(-len);
+      if (cand && /^[a-z][a-z ]*$/.test(cand) && cand.replace(/ /g, '').length >= CORE_MIN_EN) return cand;
+    }
+    return '';
+  }
+
+  function segAligned(list, cand) {
+    for (var k = 0; k < list.length; k++) {
+      var s = list[k];
+      if (s === cand) return true;
+      if (s.length < cand.length) continue;
+      if (s.indexOf(cand) === 0) return true;
+      if (s.lastIndexOf(cand) === s.length - cand.length) return true;
+    }
+    return false;
+  }
+
+  function zhCore(ma, mb) {
+    var A = segs(ma), B = segs(mb);
+    if (!A.length || !B.length) return '';
+    var best = '';
+    for (var si = 0; si < A.length; si++) {
+      var seg = A[si];
+      for (var i = 0; i < seg.length - 1; i++) {
+        for (var j = i + CORE_MIN_ZH; j <= seg.length; j++) {
+          var cand = seg.slice(i, j);
+          if (cand.length <= best.length) continue;
+          if (!/[\u4e00-\u9fff]/.test(cand)) continue;
+          var solid = false;
+          for (var k = 0; k < cand.length; k++) { if (!ZH_STOP[cand[k]]) { solid = true; break; } }
+          if (!solid) continue;
+          if (!segAligned(A, cand) || !segAligned(B, cand)) continue;
+          best = cand;
+        }
+      }
+    }
+    return best;
+  }
+
+  function groupCores(g) {
+    var notes = g.notes || [];
+    var n = notes.length;
+    var map = {};
+    function add(kind, text, i, j) {
+      var key = kind + '|' + text;
+      var c = map[key] || (map[key] = { text: text, kind: kind, members: {} });
+      c.members[i] = 1; c.members[j] = 1;
+    }
+    for (var i = 0; i < n; i++) {
+      for (var j = i + 1; j < n; j++) {
+        var e = enCore(notes[i].word, notes[j].word);
+        if (e) add('en', e, i, j);
+        var z = zhCore(notes[i].meaning, notes[j].meaning);
+        if (z) add('zh', z, i, j);
+      }
+    }
+    var all = [];
+    Object.keys(map).forEach(function (k) {
+      var c = map[k];
+      c.count = Object.keys(c.members).length;
+      if (c.count < 2) return;
+      /* 全组都有的部分属于共性，不是差异，不标 */
+      if (c.count >= n && n >= 3) return;
+      all.push(c);
+    });
+    all.sort(function (a, b) { return b.text.length - a.text.length; });
+    var picked = [], en = 0, zh = 0;
+    for (var k = 0; k < all.length && picked.length < 4; k++) {
+      var c = all[k];
+      if (c.kind === 'en') { if (en >= 2) continue; en++; }
+      else { if (zh >= 2) continue; zh++; }
+      picked.push(c);
+    }
+    return picked;
+  }
+
+  function coresOf(g) {
+    if (!g._cores) g._cores = groupCores(g);
+    return g._cores;
+  }
+
+  /* ---------------- 分歧点类型：这组词到底差在哪 ----------------
+     不是所有组都是「近义词」：有的差在词性（affect / effect），
+     有的差在写法（lie / lay），只差一个 a 的 few / a few 意思甚至相反。
+     统一按「易混词」收录，再给每组标出分歧点，读者才知道该先比什么。 */
+  var TYPE_META = {
+    sense: {
+      label: '意思相近',
+      badge: '',
+      line: '这几个词意思都相近，差别在用法和场合。'
+    },
+    root: {
+      label: '同根异用',
+      badge: '同根 · 词性不同',
+      line: '这组里关键的一对出自同一个词根，只是词性不同 —— 先看能放在哪个位置，再比意思。'
+    },
+    form: {
+      label: '形近义别',
+      badge: '形近 · 意思不同',
+      line: '这几个词写法几乎一样，意思却不同 —— 先看清差在哪几个字母。'
+    }
+  };
+  function typeMeta(g) {
+    return TYPE_META[g.groupType] || TYPE_META.sense;
+  }
+
+  function noteIndexOf(g, word) {
+    var notes = g.notes || [];
+    for (var i = 0; i < notes.length; i++) if (notes[i].word === word) return i;
+    return -1;
+  }
+
+  function markWord(word, cores, idx) {
+    var lower = String(word).toLowerCase();
+    var out = esc(word);
+    for (var k = 0; k < cores.length; k++) {
+      var c = cores[k];
+      if (c.kind !== 'en') continue;
+      if (idx >= 0 && !c.members[idx]) continue;
+      var at = lower.indexOf(c.text);
+      if (at < 0) continue;
+      var raw = word.slice(at, at + c.text.length);
+      var target = esc(raw);
+      if (out.indexOf(target) < 0) continue;
+      out = out.replace(target, '<span class="core">' + target + '</span>');
+      break;
+    }
+    return out;
+  }
+
+  function markMeaning(text, cores, idx) {
+    var out = esc(text);
+    var done = [];
+    for (var k = 0; k < cores.length; k++) {
+      var c = cores[k];
+      if (c.kind !== 'zh') continue;
+      if (idx >= 0 && !c.members[idx]) continue;
+      var hit = false;
+      for (var d = 0; d < done.length; d++) if (done[d].indexOf(c.text) >= 0) hit = true;
+      if (hit) continue;
+      var target = esc(c.text);
+      if (out.indexOf(target) < 0) continue;
+      out = out.split(target).join('<span class="core">' + target + '</span>');
+      done.push(c.text);
+    }
+    return out;
+  }
+
+  function coreStrip(g) {
+    var cs = coresOf(g);
+    if (!cs.length) return '';
+    var chips = cs.map(function (c) {
+      var tip = c.kind === 'en' ? '共用的词素' : '共用的义核';
+      return '<span class="core-chip" title="' + tip + '">' + esc(c.text) + '</span>';
+    }).join('');
+    return '<div class="core-strip">' +
+      '<span class="core-strip-label">共核</span>' + chips +
+      '<span class="core-strip-hint">青色标出的是这几个词共用的部分。</span>' +
+    '</div>';
+  }
+
   /* ---------------- DOM ---------------- */
   var content = $('#content');
   var sheet = $('#sheet');
@@ -84,7 +281,7 @@
 
   /* ---------------- 朗读 ---------------- */
   function speak(text) {
-    if (!('speechSynthesis' in window)) { toast('当前浏览器不支持朗读'); return; }
+    if (!('speechSynthesis' in window)) { toast('这个浏览器不支持朗读'); return; }
     try {
       window.speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
@@ -165,23 +362,32 @@
   function groupCard(g, idx, ts) {
     var h = hue(g.category);
     var fav = state.favorites.has(g.id);
-    var notes = (g.notes || []).slice(0, 2);
+    var cores = coresOf(g);
     var words = g.words.map(function (w) {
-      return '<span class="word-pill' + (g.lexicalType === 'phrase' ? ' is-phrase' : '') + '">' + hl(w, ts) + '</span>';
+      var ni = noteIndexOf(g, w);
+      var inner = ts.length ? hl(w, ts) : markWord(w, cores, ni);
+      return '<span class="word-pill' + (g.lexicalType === 'phrase' ? ' is-phrase' : '') + '">' + inner + '</span>';
     }).join('<span class="word-sep">/</span>');
-
-    var examples = notes.map(function (n) {
-      return '<div class="gc-ex"><b>' + hl(n.word, ts) + '</b><span>' + hl(n.example, ts) + '</span></div>';
-    }).join('');
 
     var tags = (g.tags || []).slice(0, 2).map(function (t) {
       return '<span class="tag">' + hl(t, ts) + '</span>';
     }).join('');
 
+    /* 卡片上的「共核」标签要与卡片里实际标出来的那一个一致 */
+    var enCore = null;
+    for (var ci = 0; ci < cores.length; ci++) { if (cores[ci].kind === 'en') { enCore = cores[ci]; break; } }
+    var flagCore = enCore || cores[0];
+    var flag = flagCore
+      ? '<span class="core-flag" title="这几个词共用的部分">共核 ' + esc(flagCore.text) + '</span>'
+      : '';
+    var tm = typeMeta(g);
+    var typeTag = tm.badge ? '<span class="gc-type">' + esc(tm.badge) + '</span>' : '';
+
     return '<article class="group-card" style="--cat-h:' + h + '" data-card="' + g.id + '">' +
       '<div class="gc-top">' +
-        '<span class="gc-num">' + (idx + 1) + '</span>' +
+        '<span class="gc-num">' + String(idx + 1).padStart(2, '0') + '</span>' +
         '<span class="gc-cat"><svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg>' + esc(g.category) + '</span>' +
+        typeTag +
         '<span class="gc-spacer"></span>' +
         speakBtn(g.words.join(', '), g.words.join('、')) +
         '<button class="gc-fav" data-fav="' + g.id + '" aria-pressed="' + fav + '" aria-label="' + (fav ? '取消收藏' : '收藏') + ' ' + esc(g.words.join('、')) + '">' +
@@ -191,10 +397,9 @@
       '<button class="gc-body" data-open="' + g.id + '" aria-label="查看 ' + esc(g.words.join('、')) + ' 的详细辨析">' +
         '<div class="gc-words">' + words + '</div>' +
         '<p class="gc-summary">' + hl(g.summary, ts) + '</p>' +
-        '<div class="gc-examples">' + examples + '</div>' +
       '</button>' +
-      '<div class="gc-foot">' + tags +
-        '<button class="link-btn gc-more" data-open="' + g.id + '">查看辨析<svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button>' +
+      '<div class="gc-foot">' + tags + flag +
+        '<button class="link-btn gc-more" data-open="' + g.id + '">辨析<svg class="ic" aria-hidden="true"><use href="#i-right"/></svg></button>' +
       '</div>' +
     '</article>';
   }
@@ -210,26 +415,42 @@
   }
 
   /* ---------------- 视图：搜索 ---------------- */
+  function specimenHtml() {
+    var best = null;
+    GROUPS.forEach(function (g) {
+      coresOf(g).forEach(function (c) {
+        if (c.kind !== 'en') return;
+        if (!best || c.text.length > best.c.text.length) best = { g: g, c: c };
+      });
+    });
+    if (!best) return '';
+    var g = best.g, c = best.c;
+    var idxs = Object.keys(c.members).map(Number).sort(function (a, b) { return a - b; });
+    var words = idxs.map(function (i) {
+      return '<span class="spec-word">' + markWord(g.notes[i].word, [c], i) + '</span>';
+    }).join('');
+    return '<figure class="spec">' +
+      '<figcaption class="spec-cap">共核示例 · 共享词素</figcaption>' +
+      '<div class="spec-words">' + words + '</div>' +
+      '<p class="spec-note">' + (idxs.length > 1 ? '两个词' : '这个词') + '共用的部分，也是最容易混的地方。</p>' +
+    '</figure>';
+  }
+
   function heroBlock() {
-    var favN = state.favorites.size;
-    var masterN = state.mastered.size;
+    var wordN = GROUPS.reduce(function (n, g) { return n + g.words.length; }, 0);
+    var coreN = GROUPS.filter(function (g) { return coresOf(g).length; }).length;
     return '<section class="hero">' +
       '<div class="hero-main">' +
-        '<span class="hero-badge"><svg class="ic" aria-hidden="true"><use href="#i-sparkle"/></svg>词义辨析实验室</span>' +
-        '<h2>看清 ' + GROUPS.length + ' 组高频近义词之间的边界</h2>' +
-        '<p>每个词组都给出核心义、语感差异、真实例句、选词提示与易踩坑提醒，把「意思差不多」变成「用得出来」。</p>' +
+        '<p class="hero-kicker">易混词辨析</p>' +
+        '<h1 class="hero-title"><span class="hero-l1">两个词都认识，</span><br>就是用不对</h1>' +
+        '<p class="hero-lede">每组词写清核心义、语感差别和真实例句，并把两个词共用的那部分直接标在词上。</p>' +
         '<div class="hero-actions">' +
           '<button class="btn btn-primary" data-goto="study"><svg class="ic" aria-hidden="true"><use href="#i-cards"/></svg>开始学习</button>' +
           '<button class="btn btn-ghost" data-goto="quiz"><svg class="ic" aria-hidden="true"><use href="#i-quiz"/></svg>随机测验</button>' +
         '</div>' +
+        '<p class="hero-meta">' + GROUPS.length + ' 组 · ' + wordN + ' 词条 · ' + CATS.length + ' 个分类 · ' + coreN + ' 组有共核</p>' +
       '</div>' +
-      '<div class="stat-strip">' +
-        '<div><b>' + GROUPS.length + '</b><span>词组</span></div>' +
-        '<div><b>' + GROUPS.reduce(function (n, g) { return n + g.words.length; }, 0) + '</b><span>词条</span></div>' +
-        '<div><b>' + CATS.length + '</b><span>语义分类</span></div>' +
-        '<div><b>' + favN + '</b><span>已收藏</span></div>' +
-        '<div><b>' + masterN + '</b><span>已掌握</span></div>' +
-      '</div>' +
+      specimenHtml() +
     '</section>';
   }
 
@@ -251,7 +472,7 @@
 
     html += groups.length
       ? cardGrid(groups, ts)
-      : emptyState('#i-search', '没有找到相关词组', '试试英文单词、中文含义、语义分类或例句里的用词。');
+      : emptyState('#i-search', '没找到相关词组', '换个英文词、中文意思或分类试试。');
 
     content.innerHTML = html;
   }
@@ -260,10 +481,10 @@
   function renderBrowse() {
     var ts = terms();
     var cats = state.category === 'all' ? CATS : CATS.filter(function (c) { return c === state.category; });
-    var html = '<div class="view-intro"><h1>分类浏览</h1><p>按语义领域逐组浏览，' + GROUPS.length + ' 组词义辨析共 ' +
+    var html = '<div class="view-intro"><h1>分类浏览</h1><p>按语义分类逐组浏览。' + GROUPS.length + ' 组词义辨析，' +
       GROUPS.reduce(function (n, g) { return n + g.words.length; }, 0) + ' 个词条。</p></div>';
 
-    if (!cats.length) { content.innerHTML = html + emptyState('#i-grid', '该分类暂无内容', '换一个语义分类试试。'); return; }
+    if (!cats.length) { content.innerHTML = html + emptyState('#i-grid', '这个分类下还没有内容', '换一个分类试试。'); return; }
 
     cats.forEach(function (cat) {
       var gs = GROUPS.filter(function (g) { return g.category === cat; });
@@ -282,11 +503,11 @@
   function renderFavorites() {
     var groups = GROUPS.filter(function (g) { return state.favorites.has(g.id); });
     var html = '<div class="view-intro"><h1>我的收藏</h1><p>' +
-      (groups.length ? '已收藏 ' + groups.length + ' 组词义辨析，随时回看。' : '点击任意词组右上角的书签，把易混词收进来。') +
+      (groups.length ? '已收藏 ' + groups.length + ' 组词义辨析。' : '点词组卡片上的书签图标就能存进来，收藏只存在这台设备上。') +
       '</p></div>';
     html += groups.length
       ? cardGrid(groups, terms())
-      : emptyState('#i-bookmark', '还没有收藏', '进入词组详情即可收藏，收藏会保存在本地浏览器中。');
+      : emptyState('#i-bookmark', '还没有收藏', '点词组卡片上的书签图标就能存进来，收藏只存在这台设备上。');
     content.innerHTML = html;
   }
 
@@ -296,12 +517,13 @@
     return deck.length ? deck : GROUPS;
   }
 
-  function noteBlock(n, h) {
+  function noteBlock(n, h, cores, idx) {
+    var meaning = (cores && idx >= 0) ? markMeaning(n.meaning, cores, idx) : esc(n.meaning);
     return '<div class="note-card">' +
       '<div class="note-head">' +
         '<span class="note-word' + (/\s/.test(n.word) ? ' is-phrase' : '') + '">' + esc(n.word) + '</span>' +
         speakBtn(n.word, n.word) +
-        '<span class="note-meaning">' + esc(n.meaning) + '</span>' +
+        '<span class="note-meaning">' + meaning + '</span>' +
       '</div>' +
       '<p class="note-nuance">' + esc(n.nuance) + '</p>' +
       '<div class="note-ex"><p>' + esc(n.example) + '</p><p class="tr">' + esc(n.translation) + '</p></div>' +
@@ -322,19 +544,22 @@
     var g = deck[state.studyIndex];
     var ts = terms();
     var flipped = state.studyFlipped;
+    var cores = coresOf(g);
 
     var front = '<div class="flip-face front">' +
       '<span class="study-cat"><svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg>' + esc(g.category) + '</span>' +
       '<div class="study-words">' + g.words.map(function (w) {
-        return '<span class="word-pill' + (g.lexicalType === 'phrase' ? ' is-phrase' : '') + '">' + hl(w, ts) + '</span>';
-      }).join('') + '</div>' +
+        var ni = noteIndexOf(g, w);
+        var inner = ts.length ? hl(w, ts) : markWord(w, cores, ni);
+        return '<span class="word-pill' + (g.lexicalType === 'phrase' ? ' is-phrase' : '') + '">' + inner + '</span>';
+      }).join('<span class="word-sep">/</span>') + '</div>' +
       '<p class="gc-summary" style="text-align:center">' + hl(g.summary, ts) + '</p>' +
-      '<div class="flip-hint"><svg class="ic" aria-hidden="true"><use href="#i-cards"/></svg>点击卡片查看逐词辨析</div>' +
+      '<div class="flip-hint"><svg class="ic" aria-hidden="true"><use href="#i-cards"/></svg>点击卡片翻面，看逐词辨析</div>' +
     '</div>';
 
     var back = '<div class="flip-face back">' +
       '<div class="summary-box">' + hl(g.summary, ts) + '</div>' +
-      '<div style="margin-top:14px">' + g.notes.map(function (n) { return noteBlock(n, hue(g.category)); }).join('') + '</div>' +
+      '<div style="margin-top:14px">' + g.notes.map(function (n, i) { return noteBlock(n, hue(g.category), cores, i); }).join('') + '</div>' +
       tipBlock('tip', g.choiceTip) +
       tipBlock('pit', g.pitfall) +
     '</div>';
@@ -492,12 +717,12 @@
     if (!q) {
       content.innerHTML = '<div class="quiz-wrap">' +
         '<div class="view-intro" style="text-align:center"><h1>随堂测验</h1>' +
-        '<p>从真实例句和释义里挑出正确的词，做完立刻给出辨析讲解。</p></div>' +
+        '<p>从真实例句和释义里挑出正确的词，答完立刻给出辨析讲解。</p></div>' +
         '<div class="quiz-card" style="text-align:center">' +
           '<div class="stat-strip" style="justify-content:center;margin-top:0">' +
             '<div><b>3</b><span>题型</span></div>' +
-            '<div><b>' + GROUPS.length + '</b><span>题库组</span></div>' +
-            '<div><b>' + GROUPS.reduce(function (n, x) { return n + x.notes.length; }, 0) + '</b><span>可用题目</span></div>' +
+            '<div><b>' + GROUPS.length + '</b><span>词组</span></div>' +
+            '<div><b>' + GROUPS.reduce(function (n, x) { return n + x.notes.length; }, 0) + '</b><span>题目</span></div>' +
           '</div>' +
           '<p style="margin:18px 0 10px;font-size:13px;color:var(--on-surface-3)">每轮题量</p>' +
           '<div class="options" style="grid-template-columns:repeat(3,1fr)">' +
@@ -523,7 +748,7 @@
       var html = '<div class="quiz-wrap"><div class="quiz-card quiz-result">' +
         '<div class="quiz-ring" style="--pct:' + pct + '"><div class="val">' + pct + '<small>%</small></div></div>' +
         '<h2 style="font-size:20px;font-weight:700;margin-bottom:6px">' +
-          (pct === 100 ? '全对，厉害！' : pct >= 60 ? '基础不错，再练一轮' : '别急，先回看辨析卡片') +
+          (pct === 100 ? '全对。' : pct >= 60 ? '基础不错，再练一轮' : '别急，先回看辨析卡片') +
         '</h2>' +
         '<p style="color:var(--on-surface-2);font-size:14px">答对 ' + right + ' / ' + q.questions.length + ' 题</p>' +
         '<div style="display:flex;gap:10px;margin-top:20px">' +
@@ -595,20 +820,24 @@
     var h = hue(g.category);
     var fav = state.favorites.has(g.id);
 
-    $('#sheetCat').innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg>' + esc(g.category);
+    var tm = typeMeta(g);
+    $('#sheetCat').innerHTML = '<svg class="ic" aria-hidden="true"><use href="#i-tag"/></svg>' + esc(g.category) +
+      (tm.badge ? '<span class="sheet-type">' + esc(tm.badge) + '</span>' : '');
+    var cores = coresOf(g);
     $('#sheetTitle').innerHTML = g.words.map(function (w) {
-      return '<span class="word-pill" style="background:transparent;border:none;padding:0;font-size:25px">' + esc(w) + '</span>';
+      var ni = noteIndexOf(g, w);
+      return '<span class="word-pill" style="background:transparent;border:none;padding:0;font-size:25px">' + markWord(w, cores, ni) + '</span>';
     }).join('<span class="word-sep" style="font-size:18px;margin:0 8px">/</span>');
     $('#sheetTags').innerHTML = (g.tags || []).map(function (t) { return '<span class="tag">' + esc(t) + '</span>'; }).join('');
 
     var matrix = '<div class="blk"><div class="blk-label"><svg class="ic" aria-hidden="true"><use href="#i-layers"/></svg>速查对照</div>' +
-      '<table class="matrix"><thead><tr><th>词</th><th>核心义</th><th>细微差别</th></tr></thead><tbody>' +
-      g.notes.map(function (n) {
-        return '<tr><td class="mw">' + esc(n.word) + '</td><td class="mm">' + esc(n.meaning) + '</td><td class="mn">' + esc(n.nuance) + '</td></tr>';
+      '<table class="matrix"><thead><tr><th>词</th><th>核心义</th><th>语感差别</th></tr></thead><tbody>' +
+      g.notes.map(function (n, i) {
+        return '<tr><td class="mw">' + esc(n.word) + '</td><td class="mm">' + markMeaning(n.meaning, cores, i) + '</td><td class="mn">' + esc(n.nuance) + '</td></tr>';
       }).join('') + '</tbody></table></div>';
 
     var notes = '<div class="blk"><div class="blk-label"><svg class="ic" aria-hidden="true"><use href="#i-cards"/></svg>逐词详解</div>' +
-      g.notes.map(function (n) { return noteBlock(n, h); }).join('') + '</div>';
+      g.notes.map(function (n, i) { return noteBlock(n, h, cores, i); }).join('') + '</div>';
 
     var rel = '';
     if ((g.relatedExpressions || []).length) {
@@ -618,8 +847,13 @@
         }).join('') + '</div></div>';
     }
 
+    var typeLine = tm.badge
+      ? '<div class="type-line"><span class="type-label">' + esc(tm.label) + '</span><p>' + esc(tm.line) + '</p></div>'
+      : '';
     $('#sheetBody').innerHTML =
-      '<div class="blk"><div class="blk-label"><svg class="ic" aria-hidden="true"><use href="#i-sparkle"/></svg>一句话区别</div>' +
+      typeLine +
+      coreStrip(g) +
+      '<div class="blk-label"><svg class="ic" aria-hidden="true"><use href="#i-sparkle"/></svg>一句话说清</div>' +
       '<div class="summary-box">' + esc(g.summary) + '</div></div>' +
       matrix + notes +
       '<div class="blk">' + tipBlock('tip', g.choiceTip) + '</div>' +
@@ -633,7 +867,7 @@
       '</button>' +
       '<button class="btn btn-ghost" data-speak="' + esc(g.words.join(', ')) + '" aria-label="朗读整组" style="flex:0 0 auto">' +
         '<svg class="ic" aria-hidden="true"><use href="#i-sound"/></svg></button>' +
-      '<button class="btn btn-primary" data-study-open="' + g.id + '">在卡片中复习</button>';
+      '<button class="btn btn-primary" data-study-open="' + g.id + '">复习这组词</button>';
 
     sheet.style.setProperty('--cat-h', h);
     sheet.hidden = false;
@@ -704,12 +938,14 @@
   }
 
   /* ---------------- 视图切换 ---------------- */
+  /* 副标题一律写「这个视图能干什么」，不写「能让你怎样」——
+     「更清晰地理解」「检验理解」这类讲好处不讲事实的句子，是 AI 文案的典型味道。 */
   var VIEW_META = {
-    search: { title: '搜索辨析', sub: '更清晰地理解相近词' },
+    search: { title: '搜索辨析', sub: '查一个词，看它和谁容易混' },
     browse: { title: '分类浏览', sub: '按语义领域逐组查看' },
     study: { title: '学习卡片', sub: '翻卡记忆 · 标记掌握' },
-    quiz: { title: '随堂测验', sub: '用选择题检验理解' },
-    favorites: { title: '我的收藏', sub: '收藏的词义辨析' }
+    quiz: { title: '随堂测验', sub: '做完立刻给解析' },
+    favorites: { title: '我的收藏', sub: '存下来的易混词' }
   };
 
   function setView(v) {
@@ -740,7 +976,7 @@
     var html = '<button class="chip" data-cat="all" aria-selected="' + (state.category === 'all') + '">全部 <span class="cnt">' + GROUPS.length + '</span></button>';
     CATS.forEach(function (c) {
       html += '<button class="chip" data-cat="' + esc(c) + '" aria-selected="' + (state.category === c) + '" style="--c-h:' + hue(c) + '">' +
-        '<span class="chip-dot"></span>' + esc(c) + ' <span class="cnt">' + counts[c] + '</span></button>';
+        esc(c) + ' <span class="cnt">' + counts[c] + '</span></button>';
     });
     chipRow.innerHTML = html;
   }
@@ -839,7 +1075,7 @@
     if (qc) { startQuiz(parseInt(qc.getAttribute('data-quizcount'), 10), state.quizScope || 'all'); return; }
 
     var qs = t.closest('[data-quizscope]');
-    if (qs) { state.quizScope = qs.getAttribute('data-quizscope'); toast('已选择范围，点击题量开始'); return; }
+    if (qs) { state.quizScope = qs.getAttribute('data-quizscope'); toast('范围选好了，接着选题量'); return; }
 
     var qa = t.closest('[data-quiz]');
     if (qa) {
@@ -941,7 +1177,7 @@
   function applyTheme(t) {
     document.documentElement.setAttribute('data-theme', t);
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t === 'dark' ? '#090812' : '#f2f1f9');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#14171A' : '#F0F1EF');
     save('vocablens.theme', t);
   }
   $('#themeBtn').addEventListener('click', function () {
@@ -1022,20 +1258,20 @@
     if (typing) return;
     if (e.key === '/') { e.preventDefault(); setView('search'); setTimeout(function () { searchInput.focus(); }, 60); }
     else if (e.key === '?') {
-      toast('快捷键：/ 搜索 · Esc 关闭 · 点击卡片翻面');
+      toast('按 / 搜索，Esc 关闭，点卡片翻面');
     }
   });
 
   /* 测验启动 */
   function startQuiz(count, scope) {
     var questions = buildQuiz(count, scope);
-    if (!questions.length) { toast('当前范围没有可用题目'); return; }
+    if (!questions.length) { toast('这个范围里还没有题目，换个范围试试'); return; }
     state.quiz = { questions: questions, idx: 0, picked: null, answers: [], phase: 'ask', count: count, scope: scope };
     setView('quiz');
   }
 
   /* ---------------- 初始化 ---------------- */
-  applyTheme(load('vocablens.theme', 'dark'));
+  applyTheme(load('vocablens.theme', 'light'));
   renderChips();
   setView('search');
   syncFavUI();

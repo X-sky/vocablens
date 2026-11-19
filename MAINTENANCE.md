@@ -26,8 +26,9 @@
 ```
 vocablens/
 ├── index.html        入口：模板结构（其余为平台注入物，见下）
-├── styles.css        全部样式（约 47 KB，含深浅色主题与响应式断点）
-├── app.js            全部交互逻辑，IIFE 包裹，无构建步骤
+├── fonts.css         自托管 Newsreader（base64 内嵌 woff2，~45 KB）
+├── styles.css        全部样式（约 34 KB，含深浅色主题与响应式断点）
+├── app.js            全部交互逻辑（含共核引擎），IIFE 包裹，无构建步骤
 ├── data/groups.js    词库，导出 window.GROUPS 数组
 ├── README.md         站点说明
 └── MAINTENANCE.md    本文件
@@ -35,6 +36,160 @@ vocablens/
 
 技术约束：**纯静态、零构建、零依赖**。`index.html` 在根目录，`assets` 为相对路径引用。
 因此整个目录可直接丢到任何静态托管，无需 npm / 打包。
+
+## 设计系统 v3：光学台 Optical Bench（2026-11-19 起）
+
+v2「纸与墨」已被整体替换。**v2 的问题不是难看，是撞脸** —— 暖米纸 + 高对比衬线 + 陶土红 + 发丝线，
+正是 AI 设计最常见的三件套，辨识度为零。v3 换掉了温度（暖→冷）、换掉了强调色（朱砂→镜片青）、
+并且给站点找到了一个**属于它自己的视觉论点**。
+
+### 核心隐喻
+
+词镜是一台**量词义的仪器**：台面是冷调中性灰，刻线是发丝线，全场只有一种彩色，
+而它只出现在一个地方 —— **共核**（两个近义词真正共享的那部分）。
+共享处，正是最容易混淆的地方 —— 这就是整个产品的价值，视觉系统直接把它讲出来。
+
+### 三条铁律
+
+1. **颜色服务语义，不服务装饰**。全站只有两种彩色：
+   - `--accent` 镜片青（light `#0e6a73` / dark `#5cb8c0`）= **共核 / 正确 / 当前选中 / 品牌标记**；
+   - `--clay` 陶土红（light `#a8453a` / dark `#d68c7a`）= **错误 / 易踩坑**。
+   其余全是墨与灰（`--ink` / `--ink-2` / `--ink-3` / `--rule` / `--rule-2`）。
+   分类**不再用颜色区分**（`--cat-h` 仍写在 DOM 上，样式不消费它）。
+   想加第三种彩色之前，先问它是不是在表达语义。
+2. **三档声音**：
+   - `--font-display`（Newsreader）= 英文词头 / 例句 / 数字 —— 内容是文学性的；
+   - `--font-han`（Songti SC → Noto Serif CJK SC）= 中文标题 —— 与衬线同族；
+   - `--font-sans`（系统无衬线）= 正文 / UI / 按钮 —— 框架是技术性的；
+   - `--font-mono`（等宽）= 微型标签（分类、序号、计数）—— 仪器上的刻字。
+   英文词头与中文正文**刻意不同族**：词是主角，中文是注解。
+3. **靠线条和留白分结构**。卡片**无边框无底色**，只用一条顶部发丝线分栏；直角或 2–10px 小圆角；
+   阴影只做极浅投影。**禁止**：渐变、玻璃拟态（backdrop-filter）、发光阴影、彩色光斑、
+   噪点、超大圆角胶囊、装饰性插画。
+
+### 关键色板
+
+| 令牌 | 含义 | light | dark |
+| --- | --- | --- | --- |
+| `--bg-base` | 台面底色 | `#f0f1ef` | `#14171a` |
+| `--bg-raised` | 抬起的面（卡片/弹层） | `#fafaf9` | `#1c2024` |
+| `--bg-sunk` | 凹陷面（选项底、译文块） | `#e6e8e5` | `#0f1214` |
+| `--ink` / `--ink-2` / `--ink-3` | 墨三级 | `#15181b` / `#565c61` / `#8a9096` | 反色 |
+| `--rule` / `--rule-2` | 发丝线 | `#e0e2df` / `#c2c6c2` | 透明白 13% / 26% |
+| `--accent` | 镜片青（唯一彩色） | `#0e6a73` | `#5cb8c0` |
+| `--clay` | 陶土红（错误 / 坑） | `#a8453a` | `#d68c7a` |
+
+主题默认 **light**（`app.js` 里 `load('vocablens.theme', 'light')`）；老用户 localStorage 存着 dark 的沿用暗色。
+
+### 内容定性：分歧点类型 `groupType`（2026-11-19 起）
+
+用户提出的内容硬伤：**「有些近义词如果只有词性差别，那是不是不应该归类为近义词？」** —— 是的。
+所以站点总称从「近义词」改为「**易混词**」，并给每一组标出分歧点：
+
+| `groupType` | 含义 | 组数 | 卡片徽标 |
+| --- | --- | --- | --- |
+| `sense` | 意思相近，差别在用法与场合 | 32 | 不显示（默认安静） |
+| `root` | 同一词根，词性不同 | 5 | 同根 · 词性不同 |
+| `form` | 写法几乎一样，意思却不同 | 3 | 形近 · 意思不同 |
+
+非同类的 8 组：`extinct/exterminate`、`impetus/motivation/motivate`、`scrutiny/scrutinise`、
+`affect/effect`、`economic/economical/economy`（root）；`lie/lay`、`few/a few/little/a little`、
+`used to/be used to/be accustomed to`（form）。
+
+- 字段在 `data/groups.js` 的每个组对象里，位置紧跟 `id`。
+- `library.mjs` 已支持：`patch` 可改 `groupType`，`validate` 会校验取值（缺失给警告）。
+- UI：`app.js` 的 `TYPE_META` 定义类型文案；卡片上**只给非同类的组挂徽标**，
+  详情面板顶部给一行「分歧点」说明。**别把 `sense` 也挂出来** —— 默认安静，非同类才提示。
+- 典型陷阱：`root` 组里 `impetus` 与 `motivation` 其实还是意思相近（真正同根的是
+  motivation/motivate），`economic/economical/economy` 也混了两种关系 —— 所以这类组的
+  说明写成「**这组里关键的一对**出自同一个词根」，不要断言「这几个词都同根」。
+- 改类型前先想清楚：这组是「意思差」还是「用不了」。用不了就 `root`/`form`，别硬塞成近义词。
+
+### 签名元素：共核（`app.js` 的共核引擎）
+
+这是 v3 的灵魂，也是站点唯一「别人抄不走」的东西。它**从真实数据算出来**，不是装饰。
+
+- **英文共核**：两词共享 ≥4 个字母的词素，且贴在其中至少一个词的**词首或词尾**
+  （如 institute / institution → `institut`；objective / subjective → `bjective`）。
+- **中文义核**：两词「核心义」共享 ≥2 字，且在双方释义里都**贴边**
+  （是完整词段，或贴着某词段的首/尾）—— 这样才不会跨词误配出「来的财」这种碎片。
+- **只认差异性共核**：如果某个片段全组都有（组内 ≥3 词时），它属于共性不是差异，不标。
+- 保守优先：宁可漏标，不可误标。当前 40 组中 **22 组**有共核，其余 18 组没有 —— 不要为了「看起来有」而放宽规则。
+- 引擎在 `app.js`（`groupCores` / `enCore` / `zhCore` / `markWord` / `markMeaning` / `coreStrip`），
+  **不要手改**。改规则前先跑 `/workspace/.work/audit_cores.py`（需先起本地服务）核对输出。
+
+呈现位置：
+- 卡片词头 → 共享词素标青 + 下划线（`<span class="core">`），卡片页脚有「共核 xxx」提示；
+- 详情面板顶部 → **共核条**（`.core-strip` + `.core-chip`）列出本组全部共核并解释含义；
+- 速查对照表 / 逐词详解 → 中文义核标青。
+
+### 文案规范：写人话，不写 AI 腔
+
+用户在 v3 明确提过一条要求：**「如果让别人来看，这些标语之类的像不像人类写的」**。
+改任何用户可见文字前，照下面五条自问一遍。
+
+1. **这是人说的话吗？** 真人写文案会具体、会口语、会留白；AI 写文案爱排比、爱对仗、爱下结论。
+2. **禁句式**（这些是 AI 文案的指纹，出现即改）：
+   - 「把 A 变成 B」式口号 —— 例：~~把「意思差不多」变成「用得出来」~~ → 改成「两个词都认识，就是用不对」
+   - 带引号的伪口语 —— 例：~~「意思差不多」~~，引号里若是口语就该直接说
+   - 「更…地…」「…让你…」这类讲好处不讲事实的句子 —— 例：~~更清晰地理解相近词~~ → 改成「查一个词，看它和谁容易混」
+   - 强调词堆砌：「真正」「恰好」「轻松」「立即」「彻底」
+   - 全称承诺：「每个…都…」
+   - 同一句话在页面里重复讲三遍（v3 里「共享处最容易混淆」曾出现三次，只留一处）
+3. **宁可短，不要全**：导语写一件事就够，别把 5 个功能罗列成一句话。
+   例：~~每个词组给出核心义、语感差异、真实例句、选词提示与易踩坑提醒~~ → 「每组词写清核心义、语感差别和真实例句」
+4. **说事实，不说口号**：能换成具体信息就别抒情。「答完立刻给解析」比「用选择题检验理解」有用。
+5. **同一概念用同一个词**：全站统一叫「语感差别」（表格列、导语、词条卡），
+   不要一会儿「细微差别」一会儿「语感差异」。
+
+**已经定稿的用语**（改之前先想清楚要不要动）：
+
+| 位置 | 用语 |
+| --- | --- |
+| 品牌标语 | 词镜 · 看清词的边界 |
+| 首屏大标题 | 两个词都认识，就是用不对 |
+| 首屏导语 | 每组词写清核心义、语感差别和真实例句，并把两个词共用的那部分直接标在词上。 |
+| 共核条说明 | 青色标出的是这几个词共用的部分。 |
+| 标本说明 | 两个词共用的部分，也是最容易混的地方。 |
+| 侧栏副标题 | 查一个词，看它和谁容易混 / 按语义领域逐组查看 / 翻卡记忆 · 标记掌握 / 做完立刻给解析 / 存下来的易混词 |
+
+**数据层文案**（`data/groups.js` 的 summary / choiceTip / pitfall / nuance）也按同一标准审：
+写具体的事实与真实坑点，不写「有助于…」「提升…」。历史遗留的**编辑备注泄漏**已清两处
+（track down 的「因此不放入这个单词组中」、ancestry 的「本组不必展开」）——
+以后新增词条时注意：**不要把词库维护说明写进 pitfall**，那是给编辑看的，不是给用户看的。
+
+### 结构约定（改 CSS 前必读）
+
+- 桌面端顶栏：品牌 / 搜索 / 操作 三段 + 分类图例另起一行。搜索框是**下划线式**（只有下边框）。
+- 分类标签是**等宽图例**（`.chip` + `.cnt`），不是胶囊；选中态是底部 2px 青色下划线。
+- 侧栏选中态是**左侧 2px 青色竖条**；侧栏宽 `--sidebar-w: 228px`。
+- 卡片网格：≥760px 两列 `repeat(2, minmax(0, 1fr))`，窄屏 `minmax(0, 1fr)`。
+  轨道**必须**写 `minmax(0, 1fr)`，写 `1fr` 会被内容撑爆导致横向溢出。
+- 词头列表（`.gc-words` / `.study-words` / `#sheetTitle`）是 **flex 逐词换行**：
+  词与词之间没有空格，若不用 flex，浏览器会把 `academy/institute/...` 当成一个不可断的长词硬断。
+- `:where(.content) > *` 用 `:where()` 归零，是为了让内层视图（`.quiz-wrap` 680px / `.study-wrap` 720px）
+  的 `max-width` 能压过内容区规则。**别改成普通 `.content > *`**，否则测验/学习页会被撑成全宽。
+- `app.js` 内联用了 `var(--on-surface-2)` / `var(--on-surface-3)`，改令牌时**保留这两个别名**。
+- 移动端窄屏（<600px）速查对照表会改成**堆叠块**（`.matrix td` 转 block + `::before` 前置标签）。
+
+### 字体：Newsreader 自托管
+
+- 文件：`fonts.css`（**新增文件，发布时必须一起推**），里面是 base64 内嵌的 woff2。
+- 字源：Newsreader（Production Type, SIL OFL 1.1），可变字重 wght 200–800，仅内嵌 Latin 子集，~34KB。
+- **为什么内联而不是走 CDN**：Google Fonts / jsDelivr 在国内都不稳；内联后运行时零外部请求，
+  离线也能正确渲染。改字体时重新生成：
+  ```bash
+  # 取 Latin 子集 woff2
+  curl -sL -A "Mozilla/5.0" "https://fonts.googleapis.com/css2?family=Newsreader:wght@400;600&display=swap&text=<ASCII+标点>" -o gf.css
+  # 从 gf.css 里取出 woff2 URL 下载，再 base64 写进 fonts.css 的 @font-face
+  ```
+- 回退栈已配好：Newsreader → Iowan Old Style → Palatino → Georgia，中文宋体同理。
+
+### 品牌标记
+
+`index.html` 里的 logo 是**两个交叠的圆**，交叠处填青 —— 几何上这个交叠区就叫「透镜」（vesica），
+既是「词镜」的名字，也是「共核」的图示。换色靠 `fill="var(--accent)"` + `stroke="currentColor"`，
+所以明暗主题自动适配。favicon 是同款图形写死的 hex 版。
 
 ## 发布流程
 
@@ -53,7 +208,7 @@ vocablens/
    # 组装 files 数组并推送
    mcode-tools connector call connector__github__push_files --args-file /workspace/.tmp-push.json
    # args.json = {owner:"X-sky", repo:"vocablens", branch:"gh-pages", message, files:[{path, content}]}
-   # files 必须含：index.html / styles.css / app.js / data/groups.js / README.md / MAINTENANCE.md / .nojekyll
+   # files 必须含：index.html / fonts.css / styles.css / app.js / data/groups.js / README.md / MAINTENANCE.md / .nojekyll
    ```
 
    ⚠️ 推送 = 把站点发布到**公网**，任何人拿到链接都能访问。发布前必须先向用户说明并取得确认。
@@ -155,3 +310,4 @@ window.GROUPS = [
 | 2026-11-19 | 新增词组 `heritage-legacy-tradition-inheritance-ancestry`（heritage / legacy / tradition / inheritance / ancestry，分类：历史与记忆）与 `modify-alter-convert-overhaul-transform-adapt`（modify / alter / convert / overhaul / transform / adapt，分类：动作与变化）；词库 38 → 40 组、118 → 129 词条、分类仍 29 个；发布到公网，新地址 https://q3yd8d39dmqgh.space.mcode.cn （节点 `464999192441336`）；旧站 https://8iorbardnid05.space.mcode.cn 冻结在 37 组 / 112 词条，节点改名为「旧版·已冻结」 |
 | 2026-11-19 | 机制更正：实测确认平台**每次部署都新建节点与新域名**，`project_name` 相同也不会原地更新（连续两次部署分别得到 `g5xy9n84k8r6s` 与 `q3yd8d39dmqgh`）。手册、技能文档与记忆中的「原地更新、URL 不变」说法已全部改正。删除 Drive 节点不会让已发布 URL 下线，旧网址仍可访问 |
 | 2026-11-19 | **迁移到 GitHub Pages**：新建公开仓库 https://github.com/X-sky/vocablens ，站点文件推到 `gh-pages` 分支根目录（含 `.nojekyll`），线上地址固定为 **https://x-sky.github.io/vocablens/** ，以后维护只推同一分支、网址不再变；Pages 对新仓库自动开启，无需手动开关；旧版 https://8iorbardnid05.space.mcode.cn 已删除 Drive 节点，现为 404；平台站 https://q3yd8d39dmqgh.space.mcode.cn 保留为备用镜像 |
+| 2026-11-19 | **UI 重设计 v2（Paper & Ink）**：用户反馈原版「AI 味太重」。`styles.css` 整体重写（1400 行 → 约 1200 行）：去掉极光光斑 + 噪点 + 全站玻璃拟态 + 紫青霓虹渐变 + 彩色分类 + 超大圆角胶囊；改为衬线/宋体排版、发丝分隔线、单一朱砂强调色、直角小圆角。`index.html` 移除 aurora/grain 两个装饰层、换掉渐变 favicon 与品牌图标、默认主题改为 light；`app.js` 改 hero 眉题文案、去掉 chip 彩色圆点、主题默认值改 light。修掉移动端 `.card-grid` 轨道用 `1fr` 导致卡片被 nowrap 例句撑爆的横向溢出（改 `minmax(0, 1fr)`）。v1 源文件备份在 `/workspace/vocablens-backup-v1/`。功能自检全过：搜索/分类筛选/收藏/详情弹层/测验判分/翻卡/主题切换/`/` 快捷键/移动端导航，控制台零报错 |

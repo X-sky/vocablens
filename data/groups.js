@@ -3,6 +3,7 @@
 window.GROUPS = [
   {
     "id": "academy-university",
+    "groupType": "sense",
     "words": [
       "academy",
       "institute",
@@ -72,6 +73,7 @@ window.GROUPS = [
   },
   {
     "id": "basic-rudimentary",
+    "groupType": "sense",
     "words": [
       "basic",
       "rudimentary"
@@ -114,6 +116,7 @@ window.GROUPS = [
   },
   {
     "id": "blend-mix",
+    "groupType": "sense",
     "words": [
       "blend",
       "mix"
@@ -156,6 +159,7 @@ window.GROUPS = [
   },
   {
     "id": "cosmos-universe",
+    "groupType": "sense",
     "words": [
       "cosmos",
       "universe"
@@ -198,6 +202,7 @@ window.GROUPS = [
   },
   {
     "id": "decay-decompose-rot",
+    "groupType": "sense",
     "words": [
       "decay",
       "decompose",
@@ -250,6 +255,7 @@ window.GROUPS = [
   },
   {
     "id": "esteem-prestige-respect",
+    "groupType": "sense",
     "words": [
       "esteem",
       "prestige",
@@ -302,6 +308,7 @@ window.GROUPS = [
   },
   {
     "id": "extinct-exterminate",
+    "groupType": "root",
     "words": [
       "extinct",
       "exterminate"
@@ -344,6 +351,7 @@ window.GROUPS = [
   },
   {
     "id": "impetus-motivation",
+    "groupType": "root",
     "words": [
       "impetus",
       "motivation",
@@ -396,6 +404,7 @@ window.GROUPS = [
   },
   {
     "id": "instinct-intuition",
+    "groupType": "sense",
     "words": [
       "instinct",
       "intuition"
@@ -438,6 +447,7 @@ window.GROUPS = [
   },
   {
     "id": "plume-feather",
+    "groupType": "sense",
     "words": [
       "plume",
       "feather"
@@ -480,6 +490,7 @@ window.GROUPS = [
   },
   {
     "id": "proportion-fraction",
+    "groupType": "sense",
     "words": [
       "proportion",
       "fraction"
@@ -522,6 +533,7 @@ window.GROUPS = [
   },
   {
     "id": "ratio-rate",
+    "groupType": "sense",
     "words": [
       "ratio",
       "rate"
@@ -564,6 +576,7 @@ window.GROUPS = [
   },
   {
     "id": "scrutiny-scrutinise",
+    "groupType": "root",
     "words": [
       "scrutiny",
       "scrutinise"
@@ -606,6 +619,7 @@ window.GROUPS = [
   },
   {
     "id": "spade-shovel",
+    "groupType": "sense",
     "words": [
       "spade",
       "shovel"
@@ -648,6 +662,7 @@ window.GROUPS = [
   },
   {
     "id": "trace-trail-track",
+    "groupType": "sense",
     "words": [
       "trace",
       "trail",
@@ -687,7 +702,7 @@ window.GROUPS = [
       }
     ],
     "choiceTip": "零散证据或来源用 trace；连续留下、可沿着走的踪迹用 trail；持续关注目标的位置或变化用 track。",
-    "pitfall": "track down 是“追查并找到”的短语动词，语法和语义都不等同于单词 track，因此不放入这个单词组中。",
+    "pitfall": "track down 是“追查并找到”的短语动词，语法和语义都不等同于单词 track，别拿它替换这里的 track。",
     "lexicalType": "word",
     "relatedExpressions": [
       "footprint",
@@ -700,6 +715,7 @@ window.GROUPS = [
   },
   {
     "id": "affect-effect",
+    "groupType": "root",
     "words": [
       "affect",
       "effect"
@@ -743,6 +759,7 @@ window.GROUPS = [
   },
   {
     "id": "rise-raise-arise",
+    "groupType": "sense",
     "words": [
       "rise",
       "raise",
@@ -795,6 +812,7 @@ window.GROUPS = [
   },
   {
     "id": "lie-lay",
+    "groupType": "form",
     "words": [
       "lie",
       "lay"
@@ -837,6 +855,7 @@ window.GROUPS = [
   },
   {
     "id": "economic-economical",
+    "groupType": "root",
     "words": [
       "economic",
       "economical",
@@ -888,6 +907,7 @@ window.GROUPS = [
   },
   {
     "id": "historic-historical",
+    "groupType": "sense",
     "words": [
       "historic",
       "historical"
@@ -930,6 +950,7 @@ window.GROUPS = [
   },
   {
     "id": "continuous-continual",
+    "groupType": "sense",
     "words": [
       "continuous",
       "continual"
@@ -972,6 +993,7 @@ window.GROUPS = [
   },
   {
     "id": "few-a-few-little-a-little",
+    "groupType": "form",
     "words": [
       "few",
       "a few",
@@ -1032,6 +1054,7 @@ window.GROUPS = [
   },
   {
     "id": "look-appear-seem",
+    "groupType": "sense",
     "words": [
       "look",
       "appear",
@@ -1084,6 +1107,7 @@ window.GROUPS = [
   },
   {
     "id": "objective-subjective-impartial-neutral",
+    "groupType": "sense",
     "words": [
       "objective",
       "subjective",
@@ -1144,6 +1168,7 @@ window.GROUPS = [
   },
   {
     "id": "happy-glad-pleased-delighted",
+    "groupType": "sense",
     "words": [
       "happy",
       "glad",
@@ -1204,6 +1229,7 @@ window.GROUPS = [
   },
   {
     "id": "interesting-intriguing-fascinating-compelling",
+    "groupType": "sense",
     "words": [
       "interesting",
       "intriguing",
@@ -1265,6 +1291,7 @@ window.GROUPS = [
   },
   {
     "id": "job-occupation-profession-career",
+    "groupType": "sense",
     "words": [
       "job",
       "occupation",
@@ -1325,6 +1352,7 @@ window.GROUPS = [
   },
   {
     "id": "price-cost-fee-charge",
+    "groupType": "sense",
     "words": [
       "price",
       "cost",
@@ -1385,6 +1413,7 @@ window.GROUPS = [
   },
   {
     "id": "say-speak-talk-tell",
+    "groupType": "sense",
     "words": [
       "say",
       "speak",
@@ -1445,6 +1474,7 @@ window.GROUPS = [
   },
   {
     "id": "big-large-huge-enormous",
+    "groupType": "sense",
     "words": [
       "big",
       "large",
@@ -1505,6 +1535,7 @@ window.GROUPS = [
   },
   {
     "id": "smart-clever-intelligent-wise",
+    "groupType": "sense",
     "words": [
       "smart",
       "clever",
@@ -1565,6 +1596,7 @@ window.GROUPS = [
   },
   {
     "id": "despite-in-spite-of-notwithstanding",
+    "groupType": "sense",
     "words": [
       "despite",
       "in spite of",
@@ -1616,6 +1648,7 @@ window.GROUPS = [
   },
   {
     "id": "used-to-be-used-to-acustomed-to",
+    "groupType": "form",
     "words": [
       "used to",
       "be used to",
@@ -1667,6 +1700,7 @@ window.GROUPS = [
   },
   {
     "id": "boring-dull-monotonous-tedious",
+    "groupType": "sense",
     "words": [
       "boring",
       "dull",
@@ -1727,6 +1761,7 @@ window.GROUPS = [
   },
   {
     "id": "decide-determine-choose-resolve",
+    "groupType": "sense",
     "words": [
       "decide",
       "determine",
@@ -1787,6 +1822,7 @@ window.GROUPS = [
   },
   {
     "id": "important-essential-vital-key",
+    "groupType": "sense",
     "words": [
       "important",
       "essential",
@@ -1847,6 +1883,7 @@ window.GROUPS = [
   },
   {
     "id": "problem-issue-question-topic",
+    "groupType": "sense",
     "words": [
       "problem",
       "issue",
@@ -1907,6 +1944,7 @@ window.GROUPS = [
   },
   {
     "id": "robust-sturdy-solid-durable-tough-resilient",
+    "groupType": "sense",
     "words": [
       "sturdy",
       "robust",
@@ -1990,6 +2028,7 @@ window.GROUPS = [
   },
   {
     "id": "heritage-legacy-tradition-inheritance-ancestry",
+    "groupType": "sense",
     "words": [
       "heritage",
       "legacy",
@@ -2052,7 +2091,7 @@ window.GROUPS = [
       {
         "word": "ancestry",
         "meaning": "血统；祖先；出身",
-        "nuance": "传下来的是血缘关系，不是财产也不是习俗：家族渊源（trace one's ancestry、of Japanese ancestry）。它只回答「你出自哪条血脉」，不涉及传给你的东西本身；bequest 才是专指遗嘱里留下的财产，本组不必展开。",
+        "nuance": "传下来的是血缘关系，不是财产也不是习俗：家族渊源（trace one's ancestry、of Japanese ancestry）。它只回答「你出自哪条血脉」，不涉及传给你的东西本身；遗嘱里留下的财产有专门的词 bequest。",
         "example": "He is of Irish ancestry, though he was born in Shanghai.",
         "translation": "他有爱尔兰血统，尽管他出生在上海。",
         "lexicalType": "word"
@@ -2063,6 +2102,7 @@ window.GROUPS = [
   },
   {
     "id": "modify-alter-convert-overhaul-transform-adapt",
+    "groupType": "sense",
     "words": [
       "modify",
       "alter",
